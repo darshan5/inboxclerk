@@ -6,6 +6,7 @@ dist/
 build/
 venv/
 .env
+.creds-*
 db.sqlite3
 media/
 *.log
