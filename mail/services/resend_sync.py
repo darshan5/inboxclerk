@@ -49,13 +49,31 @@ def sync_emails(user, date_from: date, date_to: date) -> dict:
         try:
             message_id = email_data.get("message_id") or email_data.get("id", "")
 
-            if Email.objects.filter(message_id=message_id).exists():
+            existing = Email.objects.filter(message_id=message_id).first()
+            if existing and existing.body_text and existing.body_html:
                 skipped += 1
                 continue
 
             detail = _fetch_email_detail(email_data["id"])
             if not detail:
                 errors += 1
+                continue
+
+            if existing:
+                existing.body_text = detail.get("text", "") or ""
+                existing.body_html = detail.get("html", "") or ""
+                existing.save(update_fields=["body_text", "body_html", "updated_at"])
+
+                # Re-fetch attachments if any had 0 bytes
+                if existing.attachments.filter(size=0).exists():
+                    existing.attachments.all().delete()
+                    _process_attachments_from_raw(detail, existing)
+                    for att in existing.attachments.filter(content_type="application/pdf"):
+                        _process_pdf(existing, att)
+
+                existing.status = Email.Status.PROCESSED
+                existing.save(update_fields=["status", "updated_at"])
+                synced += 1
                 continue
 
             email_obj = _create_email(detail, message_id, user)
