@@ -1,0 +1,1 @@
+- [PDF Parser Benchmarks](reference_pdf-parsers.md) — Python PDF parser speed/quality comparison: marker-pdf, pymupdf4llm, unstructured, textract, pypdfium2, pypdf, pdfplumber
