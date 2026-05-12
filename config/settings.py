@@ -85,6 +85,11 @@ LOGOUT_REDIRECT_URL = "/accounts/login/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("CSRF_TRUSTED_ORIGINS", "https://inboxclerk.com").split(",")
+]
+
 # Resend
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 RESEND_WEBHOOK_SECRET = os.environ.get("RESEND_WEBHOOK_SECRET", "")
