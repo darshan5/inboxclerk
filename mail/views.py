@@ -85,7 +85,7 @@ def reprocess_email(request, email_id):
 @login_required
 @require_POST
 def sync_emails_view(request):
-    from mail.services.imap_sync import sync_emails
+    from mail.services.resend_sync import sync_emails
 
     date_from_str = request.POST.get("date_from", "")
     date_to_str = request.POST.get("date_to", "")
@@ -96,13 +96,12 @@ def sync_emails_view(request):
     except ValueError:
         date_from = today
     try:
-        date_to = datetime.strptime(date_to_str, "%Y-%m-%d").date() if date_to_str else today + timedelta(days=1)
+        date_to = datetime.strptime(date_to_str, "%Y-%m-%d").date() if date_to_str else today
     except ValueError:
-        date_to = today + timedelta(days=1)
+        date_to = today
 
-    # IMAP BEFORE is exclusive, so add a day to include the end date
-    if date_to <= date_from:
-        date_to = date_from + timedelta(days=1)
+    if date_to < date_from:
+        date_to = date_from
 
     result = sync_emails(request.user, date_from, date_to)
 
