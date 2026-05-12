@@ -119,8 +119,8 @@ def sync_emails_view(request):
 @csrf_exempt
 @require_POST
 def resend_webhook(request):
-    if not _verify_resend_signature(request):
-        logger.warning("Invalid Resend webhook signature")
+    if not _verify_svix_signature(request):
+        logger.warning("Invalid Resend/Svix webhook signature")
         return JsonResponse({"error": "Invalid signature"}, status=401)
 
     try:
@@ -148,21 +148,28 @@ def resend_webhook(request):
             continue
 
     if not user:
+        from django.contrib.auth.models import User
+        user = User.objects.filter(is_superuser=True).first()
+        if user:
+            user_settings, _ = UserSettings.objects.get_or_create(user=user)
+
+    if not user:
         logger.warning("No user found for inbound addresses: %s", to_addresses)
         return JsonResponse({"error": "Unknown recipient"}, status=404)
 
-    email = parse_resend_inbound(email_data, user)
-    process_email(email)
+    email_obj = parse_resend_inbound(email_data, user)
+    process_email(email_obj)
 
-    if user_settings.ai_extraction_enabled:
-        extract_with_ai(email, custom_prompt=user_settings.ai_extraction_prompt)
+    if user_settings and user_settings.ai_extraction_enabled:
+        extract_with_ai(email_obj, custom_prompt=user_settings.ai_extraction_prompt)
 
-    run_automations(email)
+    run_automations(email_obj)
 
-    return JsonResponse({"status": "ok", "email_id": email.id})
+    return JsonResponse({"status": "ok", "email_id": email_obj.id})
 
 
-def _verify_resend_signature(request):
+def _verify_svix_signature(request):
+    import base64
     import hashlib
     import hmac
 
@@ -170,12 +177,32 @@ def _verify_resend_signature(request):
     if not secret:
         return True
 
-    signature = request.headers.get("resend-signature", "")
-    if not signature:
+    svix_id = request.headers.get("svix-id", "")
+    svix_timestamp = request.headers.get("svix-timestamp", "")
+    svix_signature = request.headers.get("svix-signature", "")
+
+    if not svix_id or not svix_timestamp or not svix_signature:
+        logger.warning("Missing svix headers: id=%s ts=%s sig=%s", bool(svix_id), bool(svix_timestamp), bool(svix_signature))
         return False
 
-    expected = hmac.new(
-        secret.encode(), request.body, hashlib.sha256
-    ).hexdigest()
+    # Svix signs: "{msg_id}.{timestamp}.{body}"
+    to_sign = f"{svix_id}.{svix_timestamp}.{request.body.decode()}".encode()
 
-    return hmac.compare_digest(signature, expected)
+    # Secret comes as "whsec_..." — strip prefix and base64 decode
+    secret_bytes = secret
+    if secret_bytes.startswith("whsec_"):
+        secret_bytes = secret_bytes[6:]
+    secret_bytes = base64.b64decode(secret_bytes)
+
+    expected = base64.b64encode(
+        hmac.new(secret_bytes, to_sign, hashlib.sha256).digest()
+    ).decode()
+
+    # svix-signature can have multiple signatures: "v1,sig1 v1,sig2"
+    for sig in svix_signature.split(" "):
+        if sig.startswith("v1,"):
+            sig_value = sig[3:]
+            if hmac.compare_digest(sig_value, expected):
+                return True
+
+    return False
