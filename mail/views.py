@@ -165,15 +165,27 @@ def resend_webhook(request, api_key):
         logger.warning("No user found for inbound addresses: %s", to_addresses)
         return JsonResponse({"error": "Unknown recipient"}, status=404)
 
-    email_obj = parse_resend_inbound(email_data, user)
-    process_email(email_obj)
+    from mail.services.resend_sync import sync_single_email
+
+    resend_id = email_data.get("id", "")
+    if resend_id:
+        result = sync_single_email(user, resend_id)
+    else:
+        email_obj = parse_resend_inbound(email_data, user)
+        process_email(email_obj)
+        result = {"email_id": email_obj.id}
 
     if user_settings and user_settings.ai_extraction_enabled:
-        extract_with_ai(email_obj, custom_prompt=user_settings.ai_extraction_prompt)
+        email_id = result.get("email_id")
+        if email_id:
+            try:
+                email_obj = Email.objects.get(id=email_id)
+                extract_with_ai(email_obj, custom_prompt=user_settings.ai_extraction_prompt)
+                run_automations(email_obj)
+            except Email.DoesNotExist:
+                pass
 
-    run_automations(email_obj)
-
-    return JsonResponse({"status": "ok", "email_id": email_obj.id})
+    return JsonResponse({"status": "ok", **result})
 
 
 def _verify_svix_signature(request):

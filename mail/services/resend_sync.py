@@ -81,6 +81,43 @@ def sync_emails(user, date_from: date, date_to: date) -> dict:
     return {"synced": synced, "skipped": skipped, "filtered": filtered, "errors": errors}
 
 
+def sync_single_email(user, resend_id: str) -> dict:
+    api_key = django_settings.RESEND_API_KEY
+    if not api_key:
+        return {"error": "RESEND_API_KEY not configured"}
+
+    try:
+        detail = _fetch_email_detail(resend_id)
+        if not detail:
+            return {"error": "Could not fetch email details"}
+
+        message_id = detail.get("message_id") or resend_id
+
+        if Email.objects.filter(message_id=message_id).exists():
+            email_obj = Email.objects.get(message_id=message_id)
+            return {"email_id": email_obj.id, "skipped": True}
+
+        email_obj = _create_email(detail, message_id, user)
+        _process_attachments_from_raw(detail, email_obj)
+
+        for att in email_obj.attachments.filter(content_type="application/pdf"):
+            _process_pdf(email_obj, att)
+
+        email_obj.status = Email.Status.PROCESSED
+        email_obj.save(update_fields=["status", "updated_at"])
+
+        ProcessingLog.objects.create(
+            email=email_obj,
+            level=ProcessingLog.Level.INFO,
+            message="Email synced via webhook + Resend API",
+        )
+        return {"email_id": email_obj.id}
+
+    except Exception as e:
+        logger.exception("Error in sync_single_email for %s", resend_id)
+        return {"error": str(e)}
+
+
 def _fetch_all_received(date_from: date, date_to: date) -> list:
     all_emails = []
     params = {"limit": 100}
