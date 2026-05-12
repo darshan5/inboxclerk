@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}PDF Comparison - {{ attachment.filename }} - InboxClerk{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <a href="{% url 'email_detail' email.id %}" class="text-sm text-blue-600 hover:underline">&larr; Back to Email</a>
+    <h1 class="text-2xl font-bold text-gray-900 mt-2">PDF Processor Comparison</h1>
+    <p class="text-gray-500 mt-1">{{ attachment.filename }} ({{ attachment.size|filesizeformat }})</p>
+</div>
+
+<!-- Summary Table -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+    <table class="w-full">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Processor</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Characters</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lines</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            {% for r in results %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ r.name }}</td>
+                <td class="px-6 py-4 text-sm text-gray-700">{{ r.time_ms }} ms</td>
+                <td class="px-6 py-4 text-sm text-gray-700">{{ r.char_count|floatformat:0 }}</td>
+                <td class="px-6 py-4 text-sm text-gray-700">{{ r.line_count }}</td>
+                <td class="px-6 py-4">
+                    {% if r.error %}
+                    <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-700">Failed</span>
+                    {% else %}
+                    <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">OK</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Output Comparison -->
+<div class="space-y-6">
+    {% for r in results %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <h2 class="text-lg font-semibold text-gray-900">{{ r.name }}</h2>
+                <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">{{ r.time_ms }} ms</span>
+                <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{{ r.char_count }} chars</span>
+                <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{{ r.line_count }} lines</span>
+            </div>
+            {% if r.error %}
+            <span class="text-xs text-red-600">{{ r.error }}</span>
+            {% endif %}
+        </div>
+        <div class="p-6">
+            {% if r.text %}
+            <pre class="whitespace-pre-wrap text-sm text-gray-700 bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto font-mono">{{ r.text }}</pre>
+            {% elif r.error %}
+            <div class="text-red-600 text-sm">Error: {{ r.error }}</div>
+            {% else %}
+            <div class="text-gray-400 text-sm">No text extracted</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -84,6 +84,27 @@ def reprocess_email(request, email_id):
 
 
 @login_required
+def compare_pdf(request, attachment_id):
+    from mail.models import Attachment
+    from mail.services.pdf_compare import compare_processors_from_bytes
+
+    attachment = get_object_or_404(Attachment, id=attachment_id, email__user=request.user)
+
+    if not attachment.is_pdf:
+        messages.error(request, "This attachment is not a PDF.")
+        return redirect("email_detail", email_id=attachment.email_id)
+
+    content = attachment.file.read()
+    results = compare_processors_from_bytes(content)
+
+    return render(request, "mail/pdf_compare.html", {
+        "attachment": attachment,
+        "email": attachment.email,
+        "results": results,
+    })
+
+
+@login_required
 @require_POST
 def sync_emails_view(request):
     from mail.services.resend_sync import sync_emails

@@ -64,13 +64,18 @@
                             {% if att.is_pdf %}<span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">PDF</span>{% endif %}
                             {% if att.ocr_applied %}<span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">OCR</span>{% endif %}
                         </div>
-                        <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full
-                            {% if att.status == 'processed' %}bg-green-100 text-green-700
-                            {% elif att.status == 'failed' %}bg-red-100 text-red-700
-                            {% elif att.status == 'processing' %}bg-yellow-100 text-yellow-700
-                            {% else %}bg-gray-100 text-gray-700{% endif %}">
-                            {{ att.get_status_display }}
-                        </span>
+                        <div class="flex items-center gap-2">
+                            {% if att.is_pdf %}
+                            <a href="{% url 'compare_pdf' att.id %}" class="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200">Compare Processors</a>
+                            {% endif %}
+                            <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full
+                                {% if att.status == 'processed' %}bg-green-100 text-green-700
+                                {% elif att.status == 'failed' %}bg-red-100 text-red-700
+                                {% elif att.status == 'processing' %}bg-yellow-100 text-yellow-700
+                                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                {{ att.get_status_display }}
+                            </span>
+                        </div>
                     </div>
                     {% if att.page_count %}<div class="text-xs text-gray-500 mb-2">{{ att.page_count }} pages</div>{% endif %}
                     {% if att.extracted_text %}
