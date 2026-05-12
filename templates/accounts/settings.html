@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Settings - InboxClerk{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-2xl font-bold text-gray-900">Settings</h1>
+</div>
+
+<form method="post" class="max-w-2xl">
+    {% csrf_token %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
+        <h2 class="text-lg font-semibold text-gray-900">Email Ingestion</h2>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Resend Inbound Address</label>
+            {{ form.resend_inbound_address }}
+            <p class="mt-1 text-xs text-gray-500">The address emails are forwarded to via Resend inbound webhooks.</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6 mt-6">
+        <h2 class="text-lg font-semibold text-gray-900">AI Extraction</h2>
+        <div class="flex items-center gap-3">
+            {{ form.ai_extraction_enabled }}
+            <label class="text-sm font-medium text-gray-700">Enable AI-powered data extraction</label>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">AI Extraction Prompt</label>
+            {{ form.ai_extraction_prompt }}
+            <p class="mt-1 text-xs text-gray-500">Custom instructions for Claude when extracting data from emails.</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6 mt-6">
+        <h2 class="text-lg font-semibold text-gray-900">Integrations</h2>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Webhook URL</label>
+            {{ form.webhook_url }}
+            <p class="mt-1 text-xs text-gray-500">URL to receive POST requests with extracted email data.</p>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Notification Email</label>
+            {{ form.notification_email }}
+            <p class="mt-1 text-xs text-gray-500">Email to notify when important emails are processed.</p>
+        </div>
+    </div>
+
+    <div class="mt-6">
+        <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
+            Save Settings
+        </button>
+    </div>
+</form>
+{% endblock %}

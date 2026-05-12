@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Execution Log - InboxClerk{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-2xl font-bold text-gray-900">Automation Execution Log</h1>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    {% if executions %}
+    <table class="w-full">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rule</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">When</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            {% for exec in executions %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ exec.rule.name }}</td>
+                <td class="px-6 py-4 text-sm">
+                    <a href="{% url 'email_detail' exec.email_id %}" class="text-blue-600 hover:underline">{{ exec.email.subject|truncatechars:40 }}</a>
+                </td>
+                <td class="px-6 py-4">
+                    <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full
+                        {% if exec.status == 'success' %}bg-green-100 text-green-700
+                        {% elif exec.status == 'failed' %}bg-red-100 text-red-700
+                        {% else %}bg-gray-100 text-gray-700{% endif %}">
+                        {{ exec.get_status_display }}
+                    </span>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500">{{ exec.executed_at|timesince }} ago</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="px-6 py-12 text-center">
+        <div class="text-gray-400 text-lg mb-2">No executions yet</div>
+        <p class="text-gray-500 text-sm">Automations will appear here after emails are processed.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

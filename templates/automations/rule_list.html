@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Automations - InboxClerk{% endblock %}
+
+{% block content %}
+<div class="mb-8 flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-gray-900">Automation Rules</h1>
+    <a href="{% url 'rule_create' %}" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">New Rule</a>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    {% if rules %}
+    <table class="w-full">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trigger</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            {% for rule in rules %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ rule.name }}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">
+                    {{ rule.get_trigger_field_display }} {{ rule.get_operator_display }} "{{ rule.trigger_value|truncatechars:30 }}"
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500">{{ rule.get_action_type_display }}</td>
+                <td class="px-6 py-4">
+                    {% if rule.is_active %}
+                    <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">Active</span>
+                    {% else %}
+                    <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700">Inactive</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 text-sm space-x-2">
+                    <a href="{% url 'rule_edit' rule.id %}" class="text-blue-600 hover:underline">Edit</a>
+                    <form method="post" action="{% url 'rule_delete' rule.id %}" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="text-red-600 hover:underline" onclick="return confirm('Delete this rule?')">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="px-6 py-12 text-center">
+        <div class="text-gray-400 text-lg mb-2">No automation rules</div>
+        <p class="text-gray-500 text-sm">Create rules to automatically process incoming emails.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

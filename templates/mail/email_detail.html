@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% load mail_filters %}
+{% block title %}{{ email.subject }} - InboxClerk{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <a href="{% url 'dashboard' %}" class="text-sm text-blue-600 hover:underline">&larr; Back to Dashboard</a>
+        <h1 class="text-2xl font-bold text-gray-900 mt-2">{{ email.subject }}</h1>
+    </div>
+    <div class="flex items-center gap-3">
+        <span class="inline-flex px-3 py-1 text-sm font-medium rounded-full
+            {% if email.status == 'received' %}bg-blue-100 text-blue-700
+            {% elif email.status == 'processing' %}bg-yellow-100 text-yellow-700
+            {% elif email.status == 'processed' %}bg-green-100 text-green-700
+            {% else %}bg-red-100 text-red-700{% endif %}">
+            {{ email.get_status_display }}
+        </span>
+        <form method="post" action="{% url 'reprocess_email' email.id %}">
+            {% csrf_token %}
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Reprocess</button>
+        </form>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main content -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Email info -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div><span class="font-medium text-gray-500">From:</span> <span class="text-gray-900">{{ email.from_address }}</span></div>
+                <div><span class="font-medium text-gray-500">To:</span> <span class="text-gray-900">{{ email.to_address }}</span></div>
+                <div><span class="font-medium text-gray-500">Received:</span> <span class="text-gray-900">{{ email.received_at }}</span></div>
+                <div><span class="font-medium text-gray-500">Message ID:</span> <span class="text-gray-900 break-all text-xs">{{ email.message_id }}</span></div>
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Email Body</h2>
+            {% if email.body_html %}
+            <div class="prose max-w-none border rounded-lg p-4 bg-gray-50">
+                {{ email.body_html|safe }}
+            </div>
+            {% elif email.body_text %}
+            <pre class="whitespace-pre-wrap text-sm text-gray-700 bg-gray-50 rounded-lg p-4">{{ email.body_text }}</pre>
+            {% else %}
+            <p class="text-gray-500">No body content</p>
+            {% endif %}
+        </div>
+
+        <!-- Attachments -->
+        {% if attachments %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Attachments ({{ attachments|length }})</h2>
+            <div class="space-y-4">
+                {% for att in attachments %}
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-medium text-gray-900">{{ att.filename }}</span>
+                            <span class="text-xs text-gray-500">{{ att.size|filesizeformat }}</span>
+                            {% if att.is_pdf %}<span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">PDF</span>{% endif %}
+                            {% if att.ocr_applied %}<span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">OCR</span>{% endif %}
+                        </div>
+                        <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full
+                            {% if att.status == 'processed' %}bg-green-100 text-green-700
+                            {% elif att.status == 'failed' %}bg-red-100 text-red-700
+                            {% elif att.status == 'processing' %}bg-yellow-100 text-yellow-700
+                            {% else %}bg-gray-100 text-gray-700{% endif %}">
+                            {{ att.get_status_display }}
+                        </span>
+                    </div>
+                    {% if att.page_count %}<div class="text-xs text-gray-500 mb-2">{{ att.page_count }} pages</div>{% endif %}
+                    {% if att.extracted_text %}
+                    <details class="mt-2">
+                        <summary class="text-sm text-blue-600 cursor-pointer hover:underline">Extracted Text</summary>
+                        <pre class="mt-2 whitespace-pre-wrap text-xs text-gray-700 bg-gray-50 rounded p-3 max-h-64 overflow-y-auto">{{ att.extracted_text }}</pre>
+                    </details>
+                    {% endif %}
+                    {% if att.error_message %}
+                    <div class="mt-2 text-sm text-red-600">Error: {{ att.error_message }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Extracted Data -->
+        {% if email.extracted_data %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Extracted Data (AI)</h2>
+            <pre class="whitespace-pre-wrap text-sm text-gray-700 bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">{{ email.extracted_data|format_json }}</pre>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="space-y-6">
+        <!-- Processing Log -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Processing Log</h2>
+            {% if logs %}
+            <div class="space-y-3">
+                {% for log in logs %}
+                <div class="text-sm">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full {% if log.level == 'error' %}bg-red-500{% elif log.level == 'warning' %}bg-yellow-500{% else %}bg-green-500{% endif %}"></span>
+                        <span class="text-xs text-gray-400">{{ log.created_at|timesince }} ago</span>
+                    </div>
+                    <div class="text-gray-700 ml-4">{{ log.message }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-500">No processing logs</p>
+            {% endif %}
+        </div>
+
+        <!-- Automation Executions -->
+        {% if executions %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Automations Run</h2>
+            <div class="space-y-3">
+                {% for exec in executions %}
+                <div class="text-sm border-b border-gray-100 pb-2">
+                    <div class="flex items-center justify-between">
+                        <span class="font-medium text-gray-900">{{ exec.rule.name }}</span>
+                        <span class="inline-flex px-2 py-0.5 text-xs rounded-full
+                            {% if exec.status == 'success' %}bg-green-100 text-green-700
+                            {% elif exec.status == 'failed' %}bg-red-100 text-red-700
+                            {% else %}bg-gray-100 text-gray-700{% endif %}">
+                            {{ exec.get_status_display }}
+                        </span>
+                    </div>
+                    <div class="text-xs text-gray-400">{{ exec.executed_at|timesince }} ago</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
