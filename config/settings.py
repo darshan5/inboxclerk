@@ -93,6 +93,7 @@ CSRF_TRUSTED_ORIGINS = [
 # Resend
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 RESEND_WEBHOOK_SECRET = os.environ.get("RESEND_WEBHOOK_SECRET", "")
+WEBHOOK_API_KEY = os.environ.get("WEBHOOK_API_KEY", "")
 
 # Anthropic
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")

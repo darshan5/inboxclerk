@@ -1,3 +1,4 @@
+import hmac
 import json
 import logging
 from datetime import date, datetime, timedelta
@@ -118,7 +119,11 @@ def sync_emails_view(request):
 
 @csrf_exempt
 @require_POST
-def resend_webhook(request):
+def resend_webhook(request, api_key):
+    if not settings.WEBHOOK_API_KEY or not hmac.compare_digest(api_key, settings.WEBHOOK_API_KEY):
+        logger.warning("Invalid webhook API key")
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+
     if not _verify_svix_signature(request):
         logger.warning("Invalid Resend/Svix webhook signature")
         return JsonResponse({"error": "Invalid signature"}, status=401)
