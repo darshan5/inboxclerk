@@ -5,6 +5,11 @@ from django.conf import settings
 class UserSettings(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="settings")
     resend_inbound_address = models.EmailField(blank=True, default="")
+    imap_host = models.CharField(max_length=200, blank=True, default="")
+    imap_port = models.IntegerField(default=993)
+    imap_username = models.EmailField(blank=True, default="")
+    imap_password = models.CharField(max_length=500, blank=True, default="")
+    imap_use_ssl = models.BooleanField(default=True)
     ai_extraction_enabled = models.BooleanField(default=True)
     ai_extraction_prompt = models.TextField(
         default="Extract key information from this email and its attachments. "

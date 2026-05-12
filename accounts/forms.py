@@ -23,6 +23,11 @@ class UserSettingsForm(forms.ModelForm):
     class Meta:
         model = UserSettings
         fields = [
+            "imap_host",
+            "imap_port",
+            "imap_username",
+            "imap_password",
+            "imap_use_ssl",
             "resend_inbound_address",
             "ai_extraction_enabled",
             "ai_extraction_prompt",
@@ -30,6 +35,25 @@ class UserSettingsForm(forms.ModelForm):
             "notification_email",
         ]
         widgets = {
+            "imap_host": forms.TextInput(attrs={
+                "class": "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500",
+                "placeholder": "imap.gmail.com",
+            }),
+            "imap_port": forms.NumberInput(attrs={
+                "class": "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500",
+            }),
+            "imap_username": forms.EmailInput(attrs={
+                "class": "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500",
+                "placeholder": "you@gmail.com",
+            }),
+            "imap_password": forms.PasswordInput(attrs={
+                "class": "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500",
+                "placeholder": "App password",
+                "autocomplete": "new-password",
+            }, render_value=True),
+            "imap_use_ssl": forms.CheckboxInput(attrs={
+                "class": "h-4 w-4 text-blue-600 rounded border-gray-300",
+            }),
             "resend_inbound_address": forms.EmailInput(attrs={
                 "class": "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500",
                 "placeholder": "your-inbox@inbound.resend.dev",

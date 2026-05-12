@@ -1,11 +1,13 @@
 import json
 import logging
+from datetime import date, datetime, timedelta
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
@@ -47,6 +49,7 @@ def dashboard(request):
         "stats": stats,
         "status_filter": status_filter or "",
         "search": search,
+        "today": date.today().isoformat(),
     })
 
 
@@ -77,6 +80,41 @@ def reprocess_email(request, email_id):
 
     run_automations(email)
     return JsonResponse({"status": "ok", "email_status": email.status})
+
+
+@login_required
+@require_POST
+def sync_emails_view(request):
+    from mail.services.imap_sync import sync_emails
+
+    date_from_str = request.POST.get("date_from", "")
+    date_to_str = request.POST.get("date_to", "")
+
+    today = date.today()
+    try:
+        date_from = datetime.strptime(date_from_str, "%Y-%m-%d").date() if date_from_str else today
+    except ValueError:
+        date_from = today
+    try:
+        date_to = datetime.strptime(date_to_str, "%Y-%m-%d").date() if date_to_str else today + timedelta(days=1)
+    except ValueError:
+        date_to = today + timedelta(days=1)
+
+    # IMAP BEFORE is exclusive, so add a day to include the end date
+    if date_to <= date_from:
+        date_to = date_from + timedelta(days=1)
+
+    result = sync_emails(request.user, date_from, date_to)
+
+    if "error" in result:
+        messages.error(request, result["error"])
+    else:
+        messages.success(
+            request,
+            f"Sync complete: {result['synced']} new, {result['skipped']} already synced, {result['errors']} errors."
+        )
+
+    return redirect("dashboard")
 
 
 @csrf_exempt
