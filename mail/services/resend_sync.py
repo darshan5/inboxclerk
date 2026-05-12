@@ -25,6 +25,10 @@ def sync_emails(user, date_from: date, date_to: date) -> dict:
     if not api_key:
         return {"error": "RESEND_API_KEY not configured on the server."}
 
+    from accounts.models import UserSettings
+    user_settings, _ = UserSettings.objects.get_or_create(user=user)
+    filter_to = user_settings.sync_filter_to_address.strip().lower()
+
     try:
         all_emails = _fetch_all_received(date_from, date_to)
     except Exception as e:
@@ -33,9 +37,15 @@ def sync_emails(user, date_from: date, date_to: date) -> dict:
 
     synced = 0
     skipped = 0
+    filtered = 0
     errors = 0
 
     for email_data in all_emails:
+        if filter_to:
+            to_list = [addr.lower() for addr in email_data.get("to", [])]
+            if filter_to not in to_list:
+                filtered += 1
+                continue
         try:
             message_id = email_data.get("message_id") or email_data.get("id", "")
 
@@ -68,7 +78,7 @@ def sync_emails(user, date_from: date, date_to: date) -> dict:
             logger.exception("Error processing Resend email %s", email_data.get("id"))
             errors += 1
 
-    return {"synced": synced, "skipped": skipped, "errors": errors}
+    return {"synced": synced, "skipped": skipped, "filtered": filtered, "errors": errors}
 
 
 def _fetch_all_received(date_from: date, date_to: date) -> list:

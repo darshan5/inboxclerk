@@ -5,6 +5,10 @@ from django.conf import settings
 class UserSettings(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="settings")
     resend_inbound_address = models.EmailField(blank=True, default="")
+    sync_filter_to_address = models.CharField(
+        max_length=500, blank=True, default="",
+        help_text="Only sync emails sent to this address. Leave blank to sync all.",
+    )
     imap_host = models.CharField(max_length=200, blank=True, default="")
     imap_port = models.IntegerField(default=993)
     imap_username = models.EmailField(blank=True, default="")

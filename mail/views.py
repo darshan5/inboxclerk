@@ -109,10 +109,13 @@ def sync_emails_view(request):
     if "error" in result:
         messages.error(request, result["error"])
     else:
-        messages.success(
-            request,
-            f"Sync complete: {result['synced']} new, {result['skipped']} already synced, {result['errors']} errors."
-        )
+        filtered = result.get('filtered', 0)
+        parts = [f"{result['synced']} new", f"{result['skipped']} already synced"]
+        if filtered:
+            parts.append(f"{filtered} filtered out")
+        if result['errors']:
+            parts.append(f"{result['errors']} errors")
+        messages.success(request, f"Sync complete: {', '.join(parts)}.")
 
     return redirect("dashboard")
 

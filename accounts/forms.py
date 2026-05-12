@@ -29,6 +29,7 @@ class UserSettingsForm(forms.ModelForm):
             "imap_password",
             "imap_use_ssl",
             "resend_inbound_address",
+            "sync_filter_to_address",
             "ai_extraction_enabled",
             "ai_extraction_prompt",
             "webhook_url",
@@ -57,6 +58,10 @@ class UserSettingsForm(forms.ModelForm):
             "resend_inbound_address": forms.EmailInput(attrs={
                 "class": "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500",
                 "placeholder": "your-inbox@inbound.resend.dev",
+            }),
+            "sync_filter_to_address": forms.TextInput(attrs={
+                "class": "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500",
+                "placeholder": "automate@inboxclerk.com",
             }),
             "ai_extraction_enabled": forms.CheckboxInput(attrs={
                 "class": "h-4 w-4 text-blue-600 rounded border-gray-300",

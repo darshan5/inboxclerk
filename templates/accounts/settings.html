@@ -38,7 +38,12 @@
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6 mt-6">
-        <h2 class="text-lg font-semibold text-gray-900">Resend Webhook (Alternative)</h2>
+        <h2 class="text-lg font-semibold text-gray-900">Email Sync</h2>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Only sync emails sent to</label>
+            {{ form.sync_filter_to_address }}
+            <p class="mt-1 text-xs text-gray-500">Only retrieve emails addressed to this recipient. Leave blank to sync all received emails.</p>
+        </div>
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Resend Inbound Address</label>
             {{ form.resend_inbound_address }}
