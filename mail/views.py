@@ -72,15 +72,30 @@ def email_detail(request, email_id):
 @login_required
 @require_POST
 def reprocess_email(request, email_id):
-    email = get_object_or_404(Email, id=email_id, user=request.user)
-    process_email(email)
+    from mail.models import Attachment
+    from mail.services.resend_sync import refetch_attachments
+
+    email_obj = get_object_or_404(Email, id=email_id, user=request.user)
+
+    has_broken = email_obj.attachments.filter(
+        Q(size=0) | Q(status=Attachment.Status.FAILED) | Q(status=Attachment.Status.PENDING)
+    ).exists()
+
+    if has_broken:
+        try:
+            refetch_attachments(email_obj, max_retries=2)
+        except Exception as e:
+            logger.exception("Failed to re-fetch attachments for email %s", email_id)
+
+    process_email(email_obj)
 
     user_settings = getattr(request.user, "settings", None)
     if user_settings and user_settings.ai_extraction_enabled:
-        extract_with_ai(email, custom_prompt=user_settings.ai_extraction_prompt)
+        extract_with_ai(email_obj, custom_prompt=user_settings.ai_extraction_prompt)
 
-    run_automations(email)
-    return JsonResponse({"status": "ok", "email_status": email.status})
+    run_automations(email_obj)
+    messages.success(request, "Email reprocessed successfully.")
+    return redirect("email_detail", email_id=email_obj.id)
 
 
 @login_required
@@ -190,7 +205,7 @@ def resend_webhook(request, api_key):
 
     resend_id = email_data.get("id", "")
     if resend_id:
-        result = sync_single_email(user, resend_id)
+        result = sync_single_email(user, resend_id, max_retries=3)
     else:
         email_obj = parse_resend_inbound(email_data, user)
         process_email(email_obj)

@@ -16,7 +16,7 @@
     <div class="absolute inset-0 bg-black bg-opacity-50" onclick="document.getElementById('sync-modal').classList.add('hidden')"></div>
     <div class="relative bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
         <h2 class="text-lg font-semibold text-gray-900 mb-4">Sync Emails</h2>
-        <form method="post" action="{% url 'sync_emails' %}">
+        <form method="post" action="{% url 'sync_emails' %}" onsubmit="return handleSyncSubmit()">
             {% csrf_token %}
             <div class="space-y-4">
                 <div>
@@ -31,9 +31,15 @@
                 </div>
             </div>
             <div class="mt-6 flex gap-3 justify-end">
-                <button type="button" onclick="document.getElementById('sync-modal').classList.add('hidden')"
+                <button type="button" id="sync-cancel-btn" onclick="document.getElementById('sync-modal').classList.add('hidden')"
                         class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Sync Now</button>
+                <button type="submit" id="sync-submit-btn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                    <svg id="sync-spinner" class="hidden animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    <span id="sync-btn-text">Sync Now</span>
+                </button>
             </div>
         </form>
     </div>
@@ -113,4 +119,23 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+function handleSyncSubmit() {
+    var btn = document.getElementById('sync-submit-btn');
+    if (btn.disabled) return false;
+
+    btn.disabled = true;
+    btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+    btn.classList.add('bg-gray-400', 'cursor-not-allowed');
+    document.getElementById('sync-spinner').classList.remove('hidden');
+    document.getElementById('sync-btn-text').textContent = 'Syncing...';
+
+    var cancelBtn = document.getElementById('sync-cancel-btn');
+    cancelBtn.disabled = true;
+    cancelBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+    return true;
+}
+</script>
 {% endblock %}

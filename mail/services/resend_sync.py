@@ -1,5 +1,6 @@
 import email as email_lib
 import logging
+import time
 from datetime import date
 
 import requests
@@ -99,7 +100,7 @@ def sync_emails(user, date_from: date, date_to: date) -> dict:
     return {"synced": synced, "skipped": skipped, "filtered": filtered, "errors": errors}
 
 
-def sync_single_email(user, resend_id: str) -> dict:
+def sync_single_email(user, resend_id: str, max_retries: int = 0) -> dict:
     api_key = django_settings.RESEND_API_KEY
     if not api_key:
         return {"error": "RESEND_API_KEY not configured"}
@@ -116,7 +117,7 @@ def sync_single_email(user, resend_id: str) -> dict:
             return {"email_id": email_obj.id, "skipped": True}
 
         email_obj = _create_email(detail, message_id, user)
-        _process_attachments_from_raw(detail, email_obj)
+        _process_attachments_from_raw(detail, email_obj, max_retries=max_retries)
 
         for att in email_obj.attachments.filter(content_type="application/pdf"):
             _process_pdf(email_obj, att)
@@ -134,6 +135,26 @@ def sync_single_email(user, resend_id: str) -> dict:
     except Exception as e:
         logger.exception("Error in sync_single_email for %s", resend_id)
         return {"error": str(e)}
+
+
+def refetch_attachments(email_obj: Email, max_retries: int = 0) -> bool:
+    from django.db.models import Q
+    resend_id = (email_obj.raw_payload or {}).get("resend_id", "")
+    if not resend_id:
+        return False
+
+    detail = _fetch_email_detail(resend_id)
+    if not detail:
+        return False
+
+    email_obj.attachments.filter(Q(size=0) | Q(status=Attachment.Status.FAILED)).delete()
+    _process_attachments_from_raw(detail, email_obj, max_retries=max_retries)
+
+    for att in email_obj.attachments.filter(content_type="application/pdf"):
+        if att.status != Attachment.Status.PROCESSED:
+            _process_pdf(email_obj, att)
+
+    return True
 
 
 def _fetch_all_received(date_from: date, date_to: date) -> list:
@@ -192,13 +213,31 @@ def _create_email(detail: dict, message_id: str, user) -> Email:
     )
 
 
-def _process_attachments_from_raw(detail: dict, email_obj: Email):
+def _process_attachments_from_raw(detail: dict, email_obj: Email, max_retries: int = 0):
     raw_info = detail.get("raw", {})
     download_url = raw_info.get("download_url", "") if raw_info else ""
 
     attachments_meta = detail.get("attachments", [])
     if not attachments_meta:
         return
+
+    resend_id = detail.get("id", "")
+
+    # Retry to get download_url if not immediately available
+    if not download_url and max_retries > 0:
+        for attempt in range(1, max_retries + 1):
+            delay = min(15 * attempt, 45)
+            logger.info("Attachment download_url not ready for %s, retry %d/%d in %ds", resend_id, attempt, max_retries, delay)
+            time.sleep(delay)
+            try:
+                refreshed = _fetch_email_detail(resend_id)
+                raw_info = refreshed.get("raw", {})
+                download_url = raw_info.get("download_url", "") if raw_info else ""
+                if download_url:
+                    detail = refreshed
+                    break
+            except Exception:
+                logger.exception("Retry %d failed to fetch detail", attempt)
 
     if not download_url:
         for att_meta in attachments_meta:
@@ -209,45 +248,65 @@ def _process_attachments_from_raw(detail: dict, email_obj: Email):
                 size=att_meta.get("size", 0),
                 status=Attachment.Status.PENDING,
             )
-        return
-
-    try:
-        resp = requests.get(download_url, timeout=60)
-        resp.raise_for_status()
-        raw_email = email_lib.message_from_bytes(resp.content)
-
-        for part in raw_email.walk():
-            disposition = part.get("Content-Disposition")
-            if not disposition or "attachment" not in disposition.lower():
-                continue
-
-            filename = part.get_filename() or "attachment"
-            content_type = part.get_content_type()
-            payload = part.get_payload(decode=True)
-            if not payload:
-                continue
-
-            att = Attachment(
-                email=email_obj,
-                filename=filename,
-                content_type=content_type,
-                size=len(payload),
-            )
-            att.file.save(filename, ContentFile(payload), save=False)
-            att.save()
-
-            ProcessingLog.objects.create(
-                email=email_obj,
-                level=ProcessingLog.Level.INFO,
-                message=f"Attachment saved: {filename} ({content_type}, {len(payload)} bytes)",
-            )
-
-    except Exception as e:
-        logger.exception("Error downloading raw email for attachments")
         ProcessingLog.objects.create(
             email=email_obj,
-            level=ProcessingLog.Level.ERROR,
-            message=f"Failed to download raw email for attachments: {e}",
+            level=ProcessingLog.Level.WARNING,
+            message="Attachments saved as placeholders — raw email not yet available",
+        )
+        return
+
+    # Download raw email with retry on failure
+    raw_content = None
+    for attempt in range(max(1, max_retries + 1)):
+        try:
+            resp = requests.get(download_url, timeout=60)
+            resp.raise_for_status()
+            if resp.content:
+                raw_content = resp.content
+                break
+        except Exception as e:
+            if attempt < max_retries:
+                delay = min(15 * (attempt + 1), 45)
+                logger.info("Raw download failed, retry %d/%d in %ds: %s", attempt + 1, max_retries, delay, e)
+                time.sleep(delay)
+            else:
+                logger.exception("Error downloading raw email for attachments")
+                ProcessingLog.objects.create(
+                    email=email_obj,
+                    level=ProcessingLog.Level.ERROR,
+                    message=f"Failed to download raw email for attachments: {e}",
+                )
+                return
+
+    if not raw_content:
+        return
+
+    raw_email = email_lib.message_from_bytes(raw_content)
+
+    for part in raw_email.walk():
+        disposition = part.get("Content-Disposition")
+        if not disposition or "attachment" not in disposition.lower():
+            continue
+
+        filename = part.get_filename() or "attachment"
+        content_type = part.get_content_type()
+        payload = part.get_payload(decode=True)
+        if not payload:
+            continue
+
+        att = Attachment(
+            email=email_obj,
+            filename=filename,
+            content_type=content_type,
+            size=len(payload),
+        )
+        att.file.save(filename, ContentFile(payload), save=False)
+        att.save()
+
+        ProcessingLog.objects.create(
+            email=email_obj,
+            level=ProcessingLog.Level.INFO,
+            message=f"Attachment saved: {filename} ({content_type}, {len(payload)} bytes)",
         )
 
 
